@@ -41,7 +41,7 @@ spec:
         []
       terminationGracePeriodSeconds: 60
       restartPolicy: Always
-      serviceAccountName: {{ .Chart.Name }}
+      serviceAccountName: {{ .Chart.Name }}-{{ .Values.env }}
       securityContext:
         runAsUser: 50000
         fsGroup: 0
@@ -51,7 +51,7 @@ spec:
           resources:
             {}
           image: {{ template "airflow_image" . }}
-          imagePullPolicy: Always
+          imagePullPolicy: Never
           volumeMounts:
             - name: config
               mountPath: "/opt/airflow/airflow.cfg"
@@ -70,7 +70,7 @@ spec:
       containers:
         - name: triggerer
           image: {{ template "airflow_image" . }}
-          imagePullPolicy: Always
+          imagePullPolicy: Never
           args:
             - bash
             - -c

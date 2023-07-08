@@ -33,7 +33,7 @@
   - name: AIRFLOW__CORE__FERNET_KEY
     valueFrom:
       secretKeyRef:
-        name: {{ .Chart.Name }}-fernet-key
+        name: {{ .Chart.Name }}-fernet-key-{{ .Values.env }}
         key: fernet-key
   - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
     value: {{ template "airflow_db_conn" . }}
@@ -60,15 +60,11 @@
   - name: NAMESPACE
     value: {{ .Release.Namespace | quote }}
 {{- end -}}
-
-
-
 {{/*  Git ssh key volume */}}
 {{- define "git_sync_ssh_key_volume" }}
-- name: git-sync-ssh-key
+- name: git-sync-secret
   secret:
-    secretName: {{ .Values.gitSync.sshKeySecret }}
-    defaultMode: 288
+    secretName: airflow-git-ssh-secret-{{ .Values.env }}
 {{- end -}}
 
 {{/*  Git sync container */}}
@@ -107,4 +103,7 @@
   volumeMounts:
     - name: dags
       mountPath: /git
+    - name: git-sync-secret
+      mountPath: /etc/git-secret
+      readOnly: true
 {{- end -}}

@@ -45,7 +45,6 @@ gitSync:
   rev: HEAD
   depth: 1
   subPath: 3_data_pipeline/dags
-  sshKeySecret: airflow-git-ssh-secret
   resources:
     requests:
       cpu: 100m

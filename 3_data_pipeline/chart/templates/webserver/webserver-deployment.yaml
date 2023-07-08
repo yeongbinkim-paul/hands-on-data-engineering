@@ -29,7 +29,7 @@ spec:
         component: webserver
         release: {{ .Chart.Name }}
     spec:
-      serviceAccountName: {{ .Chart.Name }}
+      serviceAccountName: {{ .Chart.Name }}-{{ .Values.env }}
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -50,7 +50,7 @@ spec:
           resources:
             {}
           image: {{ template "airflow_image" . }}
-          imagePullPolicy: Always
+          imagePullPolicy: Never
           volumeMounts:
             - name: config
               mountPath: "/opt/airflow/airflow.cfg"
@@ -77,7 +77,7 @@ spec:
       containers:
         - name: webserver
           image: {{ template "airflow_image" . }}
-          imagePullPolicy: Always
+          imagePullPolicy: Never
           args:
             - bash
             - -c

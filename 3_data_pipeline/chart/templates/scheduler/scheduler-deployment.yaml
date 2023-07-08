@@ -45,7 +45,7 @@ spec:
         []
       restartPolicy: Always
       terminationGracePeriodSeconds: 10
-      serviceAccountName: {{ .Chart.Name }}
+      serviceAccountName: {{ .Chart.Name }}-{{ .Values.env }}
       securityContext:
         runAsUser: 50000
         fsGroup: 0
@@ -55,7 +55,7 @@ spec:
           resources:
             {}
           image: {{ template "airflow_image" . }}
-          imagePullPolicy: Always
+          imagePullPolicy: Never
           volumeMounts:
             - name: config
               mountPath: "/opt/airflow/airflow.cfg"
@@ -80,7 +80,7 @@ spec:
         # Always run the main scheduler container.
         - name: scheduler
           image: {{ template "airflow_image" . }}
-          imagePullPolicy: Always
+          imagePullPolicy: Never
           args:
             - bash
             - -c
@@ -131,7 +131,7 @@ spec:
             requests:
               {}
           image: {{ template "airflow_image" . }}
-          imagePullPolicy: Always
+          imagePullPolicy: Never
           args:
             - bash
             - /clean-logs

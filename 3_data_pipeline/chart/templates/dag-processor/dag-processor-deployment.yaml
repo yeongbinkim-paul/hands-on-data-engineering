@@ -43,7 +43,7 @@ spec:
         []
       terminationGracePeriodSeconds: 60
       restartPolicy: Always
-      serviceAccountName: {{ .Chart.Name | quote }}
+      serviceAccountName: {{ .Chart.Name }}-{{ .Values.env }}
       securityContext:
         runAsUser: 50000
         fsGroup: 0
@@ -53,7 +53,7 @@ spec:
           resources:
             {}
           image: {{ template "airflow_image" . }}
-          imagePullPolicy: Always
+          imagePullPolicy: Never
           args:
             - airflow
             - db
@@ -67,7 +67,7 @@ spec:
       containers:
         - name: dag-processor
           image: {{ template "airflow_image" . }}
-          imagePullPolicy: Always
+          imagePullPolicy: Never
           args:
             - bash
             - -c
