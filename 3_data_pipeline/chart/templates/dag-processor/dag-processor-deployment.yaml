@@ -53,7 +53,7 @@ spec:
           resources:
             {}
           image: {{ template "airflow_image" . }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           args:
             - airflow
             - db
@@ -67,7 +67,7 @@ spec:
       containers:
         - name: dag-processor
           image: {{ template "airflow_image" . }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           args:
             - bash
             - -c

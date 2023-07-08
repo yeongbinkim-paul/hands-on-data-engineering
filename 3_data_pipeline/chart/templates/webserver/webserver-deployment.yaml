@@ -50,7 +50,7 @@ spec:
           resources:
             {}
           image: {{ template "airflow_image" . }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           volumeMounts:
             - name: config
               mountPath: "/opt/airflow/airflow.cfg"
@@ -77,7 +77,7 @@ spec:
       containers:
         - name: webserver
           image: {{ template "airflow_image" . }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           args:
             - bash
             - -c

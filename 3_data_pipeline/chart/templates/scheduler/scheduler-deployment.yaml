@@ -55,7 +55,7 @@ spec:
           resources:
             {}
           image: {{ template "airflow_image" . }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           volumeMounts:
             - name: config
               mountPath: "/opt/airflow/airflow.cfg"
@@ -80,7 +80,7 @@ spec:
         # Always run the main scheduler container.
         - name: scheduler
           image: {{ template "airflow_image" . }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           args:
             - bash
             - -c
@@ -131,7 +131,7 @@ spec:
             requests:
               {}
           image: {{ template "airflow_image" . }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           args:
             - bash
             - /clean-logs
