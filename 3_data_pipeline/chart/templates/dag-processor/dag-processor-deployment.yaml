@@ -1,0 +1,125 @@
+################################
+## Airflow Dag Processor Deployment
+#################################
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: "{{ .Chart.Name }}-dag-processor"
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+{{- with .Values.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      tier: airflow
+      component: dag-processor
+      release: {{ .Chart.Name | quote }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 50%
+  template:
+    metadata:
+      labels:
+        tier: airflow
+        component: dag-processor
+        release: {{ .Chart.Name | quote }}
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  component: dag-processor
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      tolerations:
+        []
+      topologySpreadConstraints:
+        []
+      terminationGracePeriodSeconds: 60
+      restartPolicy: Always
+      serviceAccountName: {{ .Chart.Name | quote }}
+      securityContext:
+        runAsUser: 50000
+        fsGroup: 0
+        fsGroupChangePolicy: "OnRootMismatch"
+      initContainers:
+        - name: wait-for-airflow-migrations
+          resources:
+            {}
+          image: {{ template "airflow_image" . }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - airflow
+            - db
+            - check-migrations
+            - --migration-wait-timeout=60
+          envFrom:
+            []
+          env:
+            {{- include "standard_airflow_environment" . | indent 10 }}
+      {{- include "git_sync_container" (dict "Values" .Values "is_init" "true" "Template" .Template) | nindent 8 }}
+      containers:
+        - name: dag-processor
+          image: {{ template "airflow_image" . }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - bash
+            - -c
+            - exec airflow dag-processor
+          resources:
+            {{- toYaml .Values.dagProcessor.resources | nindent 12 }}
+          volumeMounts:
+            - name: logs
+              mountPath: /opt/airflow/logs
+            - name: config
+              mountPath: /opt/airflow/pod_templates/pod_template_file.yaml
+              subPath: pod_template_file.yaml
+              readOnly: true
+            - name: config
+              mountPath: "/opt/airflow/airflow.cfg"
+              subPath: airflow.cfg
+              readOnly: true
+            - name: config
+              mountPath: "/opt/airflow/config/airflow_local_settings.py"
+              subPath: airflow_local_settings.py
+              readOnly: true
+            {{- include "airflow_dags_mount" . | nindent 12 }}
+          envFrom:
+            []
+          env:
+            {{- include "standard_airflow_environment" . | nindent 10 }}
+            {{- include "extra_airflow_environment" . | nindent 10 }}
+            - name: AIRFLOW__METRICS__STATSD_PORT
+              value: "8125"
+            - name: AIRFLOW__METRICS__STATSD_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          livenessProbe:
+            initialDelaySeconds: 10
+            timeoutSeconds: 20
+            failureThreshold: 5
+            periodSeconds: 60
+            exec:
+              command:
+                  - sh
+                  - -c
+                  - |
+                    CONNECTION_CHECK_MAX_COUNT=0 AIRFLOW__LOGGING__LOGGING_LEVEL=ERROR exec /entrypoint \
+                    airflow jobs check
+      {{- include "git_sync_container" . | indent 8 }}
+      volumes:
+        - name: dags
+          emptyDir: {}
+        - name: logs
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: {{ .Chart.Name }}-airflow-config
+        {{- include "git_sync_ssh_key_volume" . | indent 8 }}

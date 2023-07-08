@@ -1,0 +1,255 @@
+env: ~
+
+images:
+  airflow:
+    repository: ~
+    tag: ~
+
+dagProcessor:
+  enabled: true
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+scheduler:
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+    limits:
+      cpu: 1500m
+      memory: 2Gi
+
+triggerer:
+  enabled: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 1Gi
+    limits:
+      cpu: 100m
+      memory: 1Gi
+
+webserver:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: 250m
+      memory: 1Gi
+
+gitSync:
+  enabled: true
+  repo: https://github.com/yeongbinkim-paul/hands-on-data-engineering
+  branch: master
+  rev: HEAD
+  depth: 1
+  subPath: 3_data_pipeline/dags
+  sshKeySecret: airflow-git-ssh-secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+postgres:
+  enabled: true
+  postgresPassword: "production"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+postgresMainDB:
+  enabled: true
+  postgresPassword: "production"
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1Gi
+    limits:
+      cpu: 200m
+      memory: 1Gi
+
+createUserJob:
+  enabled: true
+
+airflowCfg: |-
+  [core]
+  min_serialized_dag_update_interval = 30
+  min_serialized_dag_fetch_interval = 10
+  max_num_rendered_ti_fields_per_task = 30
+
+  colored_console_log = False
+  dags_folder = {{ template "airflow_dags_folder" . }}
+  executor = KubernetesExecutor
+  load_examples = False
+  parallelism = 10000
+  dagbag_import_timeout = 300
+  dag_file_processor_timeout = 300
+  max_active_tasks_per_dag = 2000
+  max_active_runs_per_dag = 128
+
+  [database]
+  sql_alchemy_max_overflow = -1
+  sql_alchemy_pool_size = 0
+
+  [kubernetes]
+  airflow_configmap = {{ .Chart.Name }}-airflow-config
+  airflow_local_settings_configmap = {{ .Chart.Name }}-airflow-config
+  multi_namespace_mode = False
+
+  namespace = {{ .Release.Namespace }}
+  worker_container_repository = {{ .Values.images.airflow.repository }}
+  worker_container_tag = {{ .Values.images.airflow.tag }}
+  delete_worker_pods_on_failure = True
+  pod_template_file = /opt/airflow/pod_templates/pod_template_file.yaml
+  delete_worker_pods = True
+  worker_pods_creation_batch_size = 2000
+  worker_pods_queued_check_interval = 2
+  worker_pods_pending_timeout = 100
+  worker_pods_pending_timeout_check_interval = 30
+
+  [logging]
+  colored_console_log = True
+
+  [metrics]
+  statsd_on = True
+  statsd_prefix = airflow
+
+  [scheduler]
+  standalone_dag_processor = True
+  scheduler_zombie_task_threshold = 300
+  schedule_after_task_execution = True
+  run_duration = 41460
+  scheduler_heartbeat_sec = 2
+  parsing_processes = 16
+  scheduler_health_check_threshold = 200
+  killed_task_cleanup_time = 10
+  max_dagruns_per_loop_to_schedule = 2000
+
+  [webserver]
+  navbar_color =
+  enable_proxy_fix = True
+  rbac = True
+
+  base_url = http://localhost:5554
+
+  [smart_sensor]
+  use_smart_sensor = False
+
+webserverConfig: |-
+  """Default configuration for the Airflow webserver"""
+  import os
+
+  from airflow.www.fab_security.manager import AUTH_OAUTH
+  from airflow.www.security import AirflowSecurityManager
+  import logging
+  from typing import Dict, Any, List, Union
+  import os
+
+  log = logging.getLogger(__name__)
+  log.setLevel(os.getenv("AIRFLOW__LOGGING__FAB_LOGGING_LEVEL", "INFO"))
+
+  FAB_ADMIN_ROLE = "Admin"
+  DATA_ENGINEERING = 1
+
+airflowLocalSettings: |-
+  from airflow.www.utils import UIAlert
+
+  DASHBOARD_UIALERTS = [
+      UIAlert(
+        'This is Production Environment! Welcome!',
+        roles=["Admin"],
+        html=True,
+      )
+  ]
+
+podTemplate: |
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: dummy-name
+    namespace: "{{ .Release.Namespace }}"
+    labels:
+      tier: airflow
+      component: worker
+      release: {{ .Chart.Name }}
+  spec:
+    containers:
+      - args: []
+        command: []
+        envFrom:
+          []
+        env:
+          - name: AIRFLOW__METRICS__STATSD_PORT
+            value: "8125"
+          - name: AIRFLOW__METRICS__STATSD_HOST
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+          - name: AIRFLOW__CORE__EXECUTOR
+            value: LocalExecutor
+          # Hard Coded Airflow Envs
+        {{- include "standard_airflow_environment" . | nindent 6 }}
+        {{- include "extra_airflow_environment" . | nindent 6 }}
+        image: {{ template "pod_template_image" . }}
+        imagePullPolicy: IfNotPresent
+        name: base
+        ports: []
+        resources:
+          {}
+        volumeMounts:
+          - mountPath: "/opt/airflow/logs"
+            name: logs
+          - name: config
+            mountPath: "/opt/airflow/airflow.cfg"
+            subPath: airflow.cfg
+            readOnly: true
+          - name: config
+            mountPath: "/opt/airflow/config/airflow_local_settings.py"
+            subPath: airflow_local_settings.py
+            readOnly: true
+          - name: dag-data
+            mountPath: /opt/airflow/{{ .Chart.Name }}
+            subPath: {{ .Release.Namespace | quote }}
+            readOnly: True
+    hostNetwork: false
+    restartPolicy: Never
+    securityContext:
+      runAsUser: 50000
+      fsGroup: 0
+    nodeSelector:
+      #<labelname>:value
+      {}
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                component: worker
+            topologyKey: kubernetes.io/hostname
+          weight: 100
+    tolerations:
+      []
+    serviceAccountName: {{ .Chart.Name }}
+    volumes:
+    - emptyDir: {}
+      name: logs
+    - configMap:
+        name: {{ .Chart.Name }}-airflow-config
+      name: config
+    - name: dag-data
+      persistentVolumeClaim:
+        claimName: "dag-data-{{ .Release.Namespace }}-pvc"

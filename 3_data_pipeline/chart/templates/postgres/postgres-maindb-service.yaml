@@ -1,0 +1,36 @@
+{{ if .Values.postgresMainDB.enabled }}
+# Source: airflow/charts/postgresql/templates/svc-headless.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: "postgresql-maindb-headless-{{ .Release.Namespace }}"
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+    app: "postgresql-maindb-{{ .Release.Namespace }}"
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: postgresql-maindb-{{ .Release.Namespace }}
+      port: 5678
+      targetPort: 5678
+  selector:
+    app: "postgresql-maindb-{{ .Release.Namespace }}"
+---
+# Source: airflow/charts/postgresql/templates/svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: "postgresql-maindb-{{ .Release.Namespace }}"
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+    app: "postgresql-maindb-{{ .Release.Namespace }}"
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgresql-maindb-{{ .Release.Namespace }}
+      port: 5678
+      targetPort: 5678
+  selector:
+    app: "postgresql-maindb-{{ .Release.Namespace }}"
+{{ end }}

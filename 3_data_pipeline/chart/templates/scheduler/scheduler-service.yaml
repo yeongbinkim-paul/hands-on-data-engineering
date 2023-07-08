@@ -1,0 +1,23 @@
+################################
+## Airflow Scheduler Service
+#################################
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ .Chart.Name }}-scheduler
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+{{- with .Values.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  type: ClusterIP
+  selector:
+    tier: airflow
+    component: scheduler
+    release: {{ .Chart.Name }}
+  ports:
+    - name: task-logs
+      protocol: TCP
+      port: 8793
+      targetPort: 8793

@@ -1,0 +1,146 @@
+################################
+## Airflow Webserver Deployment
+#################################
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ .Chart.Name }}-webserver
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+{{- with .Values.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      tier: airflow
+      component: webserver
+      release: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        tier: airflow
+        component: webserver
+        release: {{ .Chart.Name }}
+    spec:
+      serviceAccountName: {{ .Chart.Name }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  component: webserver
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      tolerations:
+        []
+      restartPolicy: Always
+      securityContext:
+        runAsUser: 50000
+        fsGroup: 0
+      initContainers:
+        - name: wait-for-airflow-migrations
+          resources:
+            {}
+          image: {{ template "airflow_image" . }}
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: config
+              mountPath: "/opt/airflow/airflow.cfg"
+              subPath: airflow.cfg
+              readOnly: true
+            - name: config
+              mountPath: "/opt/airflow/config/airflow_local_settings.py"
+              subPath: airflow_local_settings.py
+              readOnly: true
+            - name: config
+              mountPath: "/opt/airflow/webserver_config.py"
+              subPath: webserver_config.py
+              readOnly: true
+          args:
+            - airflow
+            - db
+            - check-migrations
+            - --migration-wait-timeout=60
+          envFrom:
+            []
+          env:
+            {{- include "standard_airflow_environment" . | indent 10 }}
+      {{- include "git_sync_container" (dict "Values" .Values "is_init" "true" "Template" .Template) | nindent 8 }}
+      containers:
+        - name: webserver
+          image: {{ template "airflow_image" . }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - bash
+            - -c
+            - exec airflow webserver
+          resources: {{- toYaml .Values.webserver.resources | nindent 12 }}
+          volumeMounts:
+            - name: logs
+              mountPath: /opt/airflow/logs
+            - name: config
+              mountPath: /opt/airflow/pod_templates/pod_template_file.yaml
+              subPath: pod_template_file.yaml
+              readOnly: true
+            - name: config
+              mountPath: "/opt/airflow/airflow.cfg"
+              subPath: airflow.cfg
+              readOnly: true
+            - name: config
+              mountPath: "/opt/airflow/config/airflow_local_settings.py"
+              subPath: airflow_local_settings.py
+              readOnly: true
+            - name: config
+              mountPath: "/opt/airflow/webserver_config.py"
+              subPath: webserver_config.py
+              readOnly: true
+          ports:
+            - name: airflow-ui
+              containerPort: 5555
+          livenessProbe:
+            httpGet:
+              path: {{ template "airflow_liveness_probe_path" . }}
+              port: 5555
+              httpHeaders:
+              - name: Host
+                value: localhost
+              scheme: HTTP
+            initialDelaySeconds: 15
+            timeoutSeconds: 30
+            failureThreshold: 20
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: {{ template "airflow_liveness_probe_path" . }}
+              port: 5555
+              httpHeaders:
+              - name: Host
+                value: localhost
+              scheme: HTTP
+            initialDelaySeconds: 15
+            timeoutSeconds: 30
+            failureThreshold: 20
+            periodSeconds: 5
+          envFrom:
+            []
+          env:
+            {{- include "standard_airflow_environment" . | nindent 10 }}
+            {{- include "extra_airflow_environment" . | nindent 10 }}
+      {{- include "git_sync_container" . | indent 8 }}
+      volumes:
+        - name: dags
+          emptyDir: {}
+        - name: logs
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: {{ .Chart.Name }}-airflow-config
+        {{- include "git_sync_ssh_key_volume" . | indent 8 }}

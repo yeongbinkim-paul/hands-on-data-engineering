@@ -1,0 +1,154 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ .Chart.Name }}-scheduler
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+{{- with .Values.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  replicas: 1
+  strategy:
+    # Kill the scheduler as soon as possible.
+    # It will restart quickly with all the workers, minimizing the time they are not synchronized.
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 100%
+  selector:
+    matchLabels:
+      tier: airflow
+      component: scheduler
+      release: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        tier: airflow
+        component: scheduler
+        release: {{ .Chart.Name }}
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  component: scheduler
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      {{- with .Values.scheduler.nodeSelector }}
+      nodeSelector:
+        {{ toYaml . }}
+      {{- end }}
+      tolerations:
+        []
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 10
+      serviceAccountName: {{ .Chart.Name }}
+      securityContext:
+        runAsUser: 50000
+        fsGroup: 0
+        fsGroupChangePolicy: "OnRootMismatch"
+      initContainers:
+        - name: wait-for-airflow-migrations
+          resources:
+            {}
+          image: {{ template "airflow_image" . }}
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: config
+              mountPath: "/opt/airflow/airflow.cfg"
+              subPath: airflow.cfg
+              readOnly: true
+            - name: config
+              mountPath: "/opt/airflow/config/airflow_local_settings.py"
+              subPath: airflow_local_settings.py
+              readOnly: true
+          args:
+            - airflow
+            - db
+            - check-migrations
+            - --migration-wait-timeout=60
+          envFrom:
+            []
+          env:
+            {{- include "standard_airflow_environment" . | indent 10 }}
+      {{- include "git_sync_container" (dict "Values" .Values "is_init" "true" "Template" .Template) | nindent 8 }}
+
+      containers:
+        # Always run the main scheduler container.
+        - name: scheduler
+          image: {{ template "airflow_image" . }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - bash
+            - -c
+            - exec airflow scheduler
+          resources:
+            {{- toYaml .Values.scheduler.resources | nindent 12 }}
+          envFrom:
+            []
+          env:
+            {{- include "standard_airflow_environment" . | indent 10 }}
+            {{- include "extra_airflow_environment" . | indent 10 }}
+            - name: AIRFLOW__METRICS__STATSD_PORT
+              value: "8125"
+            - name: AIRFLOW__METRICS__STATSD_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          livenessProbe:
+            initialDelaySeconds: 10
+            timeoutSeconds: 20
+            failureThreshold: 5
+            periodSeconds: 60
+            exec:
+              command:
+                  - sh
+                  - -c
+                  - |
+                    CONNECTION_CHECK_MAX_COUNT=0 AIRFLOW__LOGGING__LOGGING_LEVEL=ERROR exec /entrypoint \
+                    airflow jobs check --job-type SchedulerJob --hostname $(hostname)
+          volumeMounts:
+            - name: logs
+              mountPath: /opt/airflow/logs
+            - name: config
+              mountPath: /opt/airflow/pod_templates/pod_template_file.yaml
+              subPath: pod_template_file.yaml
+              readOnly: true
+            - name: config
+              mountPath: "/opt/airflow/airflow.cfg"
+              subPath: airflow.cfg
+              readOnly: true
+            - name: config
+              mountPath: "/opt/airflow/config/airflow_local_settings.py"
+              subPath: airflow_local_settings.py
+              readOnly: true
+            {{- include "airflow_dags_mount" . | nindent 12 }}
+        - name: scheduler-log-groomer
+          resources:
+            requests:
+              {}
+          image: {{ template "airflow_image" . }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - bash
+            - /clean-logs
+
+          env:
+            - name: AIRFLOW__LOG_RETENTION_DAYS
+              value: "15"
+          volumeMounts:
+            - name: logs
+              mountPath: "/opt/airflow/logs"
+      {{- include "git_sync_container" . | indent 8 }}
+      volumes:
+        - name: dags
+          emptyDir: {}
+        - name: logs
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: {{ .Chart.Name }}-airflow-config
+        {{- include "git_sync_ssh_key_volume" . | indent 8 }}

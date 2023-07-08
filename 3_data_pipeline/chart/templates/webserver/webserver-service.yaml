@@ -1,0 +1,21 @@
+################################
+## Airflow Webserver Service
+#################################
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ .Chart.Name }}-webserver
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+{{- with .Values.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  type: ClusterIP
+  selector:
+    tier: airflow
+    component: webserver
+    release: {{ .Chart.Name }}
+  ports:
+    - name: airflow-ui
+      port: 5555
