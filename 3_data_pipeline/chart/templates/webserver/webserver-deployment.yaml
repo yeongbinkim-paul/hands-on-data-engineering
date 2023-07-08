@@ -4,7 +4,7 @@
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: "{{ .Chart.Name }}-webserver-{{ .Values.env }}"
+  name: {{ .Chart.Name }}-webserver-{{ .Values.env }}
   namespace: "{{ .Release.Namespace }}"
   labels:
 {{- with .Values.labels }}
@@ -134,7 +134,6 @@ spec:
           env:
             {{- include "standard_airflow_environment" . | nindent 10 }}
             {{- include "extra_airflow_environment" . | nindent 10 }}
-      {{- include "git_sync_container" . | indent 8 }}
       volumes:
         - name: dags
           emptyDir: {}
@@ -142,5 +141,5 @@ spec:
           emptyDir: {}
         - name: config
           configMap:
-            name: {{ .Chart.Name }}-airflow-config
+            name: {{ .Chart.Name }}-airflow-config-{{ .Values.env }}
         {{- include "git_sync_ssh_key_volume" . | indent 8 }}

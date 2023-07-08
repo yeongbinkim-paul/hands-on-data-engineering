@@ -100,8 +100,8 @@ airflowCfg: |-
   sql_alchemy_pool_size = 0
 
   [kubernetes]
-  airflow_configmap = {{ .Chart.Name }}-airflow-config
-  airflow_local_settings_configmap = {{ .Chart.Name }}-airflow-config
+  airflow_configmap = {{ .Chart.Name }}-airflow-config-{{ .Values.env }}
+  airflow_local_settings_configmap = {{ .Chart.Name }}-airflow-config-{{ .Values.env }}
   multi_namespace_mode = False
 
   namespace = {{ .Release.Namespace }}
@@ -246,7 +246,7 @@ podTemplate: |
     - emptyDir: {}
       name: logs
     - configMap:
-        name: {{ .Chart.Name }}-airflow-config
+        name: {{ .Chart.Name }}-airflow-config-{{ .Values.env }}
       name: config
     - name: dag-data
       persistentVolumeClaim:

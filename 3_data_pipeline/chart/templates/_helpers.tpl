@@ -73,7 +73,7 @@
 
 {{/*  Git sync container */}}
 {{- define "git_sync_container" }}
-- name: git_sync_container
+- name: git-sync-container
   image: {{ template "git_sync_image" . }}
   imagePullPolicy: {{ .Values.images.gitSync.pullPolicy }}
   env:
@@ -107,12 +107,4 @@
   volumeMounts:
     - name: dags
       mountPath: /git
-    - name: gitsync
-      mountPath: /etc/git-secret/ssh
-      readOnly: true
-      subPath: gitSshKey
-    - name: gitsync
-      mountPath: /etc/git-secret/known_hosts
-      readOnly: true
-      subPath: knownHosts
 {{- end -}}

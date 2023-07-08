@@ -1,7 +1,7 @@
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: "{{ .Chart.Name }}-scheduler-{{ .Values.env }}"
+  name: {{ .Chart.Name }}-scheduler-{{ .Values.env }}
   namespace: "{{ .Release.Namespace }}"
   labels:
 {{- with .Values.labels }}
@@ -142,7 +142,6 @@ spec:
           volumeMounts:
             - name: logs
               mountPath: "/opt/airflow/logs"
-      {{- include "git_sync_container" . | indent 8 }}
       volumes:
         - name: dags
           emptyDir: {}
@@ -150,5 +149,5 @@ spec:
           emptyDir: {}
         - name: config
           configMap:
-            name: {{ .Chart.Name }}-airflow-config
+            name: {{ .Chart.Name }}-airflow-config-{{ .Values.env }}
         {{- include "git_sync_ssh_key_volume" . | indent 8 }}

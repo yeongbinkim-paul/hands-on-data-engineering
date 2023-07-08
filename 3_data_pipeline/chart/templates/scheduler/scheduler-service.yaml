@@ -4,7 +4,7 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: "{{ .Chart.Name }}-scheduler-{{ .Values.env }}"
+  name: {{ .Chart.Name }}-scheduler-{{ .Values.env }}
   namespace: "{{ .Release.Namespace }}"
   labels:
 {{- with .Values.labels }}

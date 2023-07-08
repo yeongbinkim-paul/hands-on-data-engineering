@@ -1,0 +1,20 @@
+################################
+## Airflow Pod Reader Role Binding
+#################################
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Chart.Name }}-pod-log-reader-rolebinding-{{ .Values.env }}
+  labels:
+{{- with .Values.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Chart.Name }}-pod-log-reader-role-{{ .Values.env }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Chart.Name }}-{{ .Values.env }}
+    namespace: "{{ .Release.Namespace }}"
