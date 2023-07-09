@@ -23,19 +23,13 @@ spec:
     spec:
       containers:
         - name: postgresql-{{ .Release.Namespace }}
-          image: docker.io/bitnami/postgresql:11.12.0-debian-10-r44
+          image: postgres:15.3
           imagePullPolicy: "IfNotPresent"
           resources:
 {{ toYaml .Values.postgres.resources | indent 12 }}
           env:
-            - name: BITNAMI_DEBUG
-              value: "false"
             - name: POSTGRESQL_PORT_NUMBER
               value: "5432"
-            - name: POSTGRESQL_VOLUME_DIR
-              value: "/bitnami/postgresql"
-            - name: PGDATA
-              value: "/bitnami/postgresql/data"
             - name: POSTGRES_USER
               value: "postgres"
             - name: POSTGRES_PASSWORD
@@ -48,14 +42,14 @@ spec:
             - name: POSTGRESQL_ENABLE_LDAP
               value: "no"
           ports:
-            - name: tcp-postgresql
+            - name: airflow
               containerPort: 5432
           livenessProbe:
             exec:
               command:
                 - /bin/sh
                 - -c
-                - exec pg_isready -U "postgres" -d "{{ .Release.Namespace }}-airflow" -h 127.0.0.1 -p 5432
+                - exec pg_isready -U "postgres" -d "airflow" -h 127.0.0.1 -p 5432
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
@@ -68,7 +62,7 @@ spec:
                 - -c
                 - -e
                 - |
-                  exec pg_isready -U "postgres" -d "{{ .Release.Namespace }}-airflow" -h 127.0.0.1 -p 5432
+                  exec pg_isready -U "postgres" -d "airflow" -h 127.0.0.1 -p 5432
                   [ -f /opt/bitnami/postgresql/tmp/.initialized ] || [ -f /bitnami/postgresql/.initialized ]
             initialDelaySeconds: 5
             periodSeconds: 10

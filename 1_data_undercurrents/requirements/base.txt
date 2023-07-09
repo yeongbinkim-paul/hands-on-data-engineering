@@ -1,7 +1,8 @@
+psycopg2-binary
+azure-servicebus
 tqdm==4.62.3
 arrow==1.2.1
 throttle==0.2.2
-psycopg2-binary==2.9.2
 pytz==2021.3
 dnspython==2.1.0
 github3.py==3.0.0

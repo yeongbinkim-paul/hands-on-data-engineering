@@ -42,9 +42,16 @@ gitSync:
   enabled: true
   repo: https://github.com/yeongbinkim-paul/hands-on-data-engineering
   branch: dev
-  rev: HEAD
-  depth: 1
   subPath: 3_data_pipeline/dags
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+updateDag:
   resources:
     requests:
       cpu: 100m
@@ -63,17 +70,6 @@ postgres:
     limits:
       cpu: 200m
       memory: 256Mi
-
-postgresMainDB:
-  enabled: true
-  postgresPassword: "test"
-  resources:
-    requests:
-      cpu: 200m
-      memory: 1Gi
-    limits:
-      cpu: 200m
-      memory: 1Gi
 
 createUserJob:
   enabled: true

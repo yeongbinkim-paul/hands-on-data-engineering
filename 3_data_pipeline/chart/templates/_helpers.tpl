@@ -1,5 +1,5 @@
 {{- define "airflow_dags_folder" -}}
-/opt/airflow/data-pipeline/dags
+/opt/airflow
 {{- end -}}
 
 {{- define "git_sync_image" -}}
@@ -7,7 +7,7 @@
 {{- end -}}
 
 {{- define "airflow_db_conn" -}}
-{{ printf "postgresql+psycopg2://postgres:%s@postgresql-%s:5432/airflow" .Values.postgres.postgresPassword .Release.Namespace }}
+{{ printf "postgresql://postgres:%s@postgresql-%s:5432/airflow" .Values.postgres.postgresPassword .Release.Namespace }}
 {{- end -}}
 
 {{- define "airflow_image" -}}
@@ -22,11 +22,6 @@
 /health
 {{- end -}}
 
-{{- define "airflow_dags_mount" }}
-- name: dags
-  mountPath: {{ template "airflow_dags_folder" . }}
-  readOnly: true
-{{- end -}}
 
 {{/* Standard Airflow environment variables */}}
 {{- define "standard_airflow_environment" }}
@@ -60,6 +55,7 @@
   - name: NAMESPACE
     value: {{ .Release.Namespace | quote }}
 {{- end -}}
+
 {{/*  Git ssh key volume */}}
 {{- define "git_sync_ssh_key_volume" }}
 - name: git-sync-secret
@@ -72,6 +68,8 @@
 - name: git-sync-container
   image: {{ template "git_sync_image" . }}
   imagePullPolicy: {{ .Values.images.gitSync.pullPolicy }}
+  securityContext:
+    runAsUser: 50000
   env:
     - name: GIT_SSH_KEY_FILE
       value: "/etc/git-secret/ssh"
@@ -81,28 +79,16 @@
       value: "true"
     - name: GIT_SSH_KNOWN_HOSTS_FILE
       value: "/etc/git-secret/known_hosts"
-    - name: GIT_SYNC_REV
-      value: {{ .Values.gitSync.rev | quote }}
     - name: GIT_SYNC_BRANCH
       value: {{ .Values.gitSync.branch | quote }}
     - name: GIT_SYNC_REPO
       value: {{ .Values.gitSync.repo | quote }}
-    - name: GIT_SYNC_DEPTH
-      value: {{ .Values.gitSync.depth | quote }}
     - name: GIT_SYNC_ROOT
-      value: "/git"
-    - name: GIT_SYNC_DEST
-      value: "repo"
-    - name: GIT_SYNC_ADD_USER
+      value: "/opt/airflow/data-pipeline/"
+    - name: GIT_SYNC_ONE_TIME
       value: "true"
-    {{- range $i, $config := .Values.gitSync.env }}
-    - name: {{ $config.name }}
-      value: {{ $config.value | quote }}
-    {{- end }}
   resources: {{ toYaml .Values.gitSync.resources | nindent 6 }}
   volumeMounts:
-    - name: dags
-      mountPath: /git
     - name: git-sync-secret
       mountPath: /etc/git-secret
       readOnly: true

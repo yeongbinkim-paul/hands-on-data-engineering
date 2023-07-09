@@ -74,10 +74,9 @@ spec:
             []
           env:
             {{- include "standard_airflow_environment" . | indent 10 }}
-      {{- include "git_sync_container" (dict "Values" .Values "is_init" "true" "Template" .Template) | nindent 8 }}
+
 
       containers:
-        # Always run the main scheduler container.
         - name: scheduler
           image: {{ template "airflow_image" . }}
           imagePullPolicy: Never
@@ -125,7 +124,8 @@ spec:
               mountPath: "/opt/airflow/config/airflow_local_settings.py"
               subPath: airflow_local_settings.py
               readOnly: true
-            {{- include "airflow_dags_mount" . | nindent 12 }}
+            - name: dag-data
+              mountPath: /opt/airflow/data-pipeline
         - name: scheduler-log-groomer
           resources:
             requests:
@@ -143,11 +143,11 @@ spec:
             - name: logs
               mountPath: "/opt/airflow/logs"
       volumes:
-        - name: dags
-          emptyDir: {}
+        - name: dag-data
+          persistentVolumeClaim:
+            claimName: "dag-data-{{ .Values.env }}-pvc"
         - name: logs
           emptyDir: {}
         - name: config
           configMap:
             name: {{ .Chart.Name }}-airflow-config-{{ .Values.env }}
-        {{- include "git_sync_ssh_key_volume" . | indent 8 }}

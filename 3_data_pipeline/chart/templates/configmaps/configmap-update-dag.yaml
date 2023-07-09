@@ -1,0 +1,30 @@
+################################
+## Airflow ConfigMap Update DAG
+#################################
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Chart.Name }}-update-dag-{{ .Values.env }}"
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+{{- with .Values.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+data:
+  update-dag.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    set -x
+
+    if [ -d "/opt/airflow/data-pipeline" ]; then
+      cd /opt/airflow
+      git clone -b {{ .Values.gitSync.branch }} {{ .Values.gitSync.repo }} data-pipeline
+    else
+      cd /opt/airflow/data-pipeline
+      while true
+        do
+          git checkout {{ .Values.gitSync.branch }}
+          git pull
+          sleep 10
+        done
+    fi

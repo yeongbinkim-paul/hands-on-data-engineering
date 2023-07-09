@@ -68,12 +68,11 @@ spec:
             - airflow
             - db
             - check-migrations
-            - --migration-wait-timeout=60
+            - --migration-wait-timeout=180
           envFrom:
             []
           env:
             {{- include "standard_airflow_environment" . | indent 10 }}
-      {{- include "git_sync_container" (dict "Values" .Values "is_init" "true" "Template" .Template) | nindent 8 }}
       containers:
         - name: webserver
           image: {{ template "airflow_image" . }}
@@ -105,41 +104,14 @@ spec:
           ports:
             - name: airflow-ui
               containerPort: 5555
-          livenessProbe:
-            httpGet:
-              path: {{ template "airflow_liveness_probe_path" . }}
-              port: 5555
-              httpHeaders:
-              - name: Host
-                value: localhost
-              scheme: HTTP
-            initialDelaySeconds: 15
-            timeoutSeconds: 30
-            failureThreshold: 20
-            periodSeconds: 5
-          readinessProbe:
-            httpGet:
-              path: {{ template "airflow_liveness_probe_path" . }}
-              port: 5555
-              httpHeaders:
-              - name: Host
-                value: localhost
-              scheme: HTTP
-            initialDelaySeconds: 15
-            timeoutSeconds: 30
-            failureThreshold: 20
-            periodSeconds: 5
           envFrom:
             []
           env:
             {{- include "standard_airflow_environment" . | nindent 10 }}
             {{- include "extra_airflow_environment" . | nindent 10 }}
       volumes:
-        - name: dags
-          emptyDir: {}
         - name: logs
           emptyDir: {}
         - name: config
           configMap:
             name: {{ .Chart.Name }}-airflow-config-{{ .Values.env }}
-        {{- include "git_sync_ssh_key_volume" . | indent 8 }}

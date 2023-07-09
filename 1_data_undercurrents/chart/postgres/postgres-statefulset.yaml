@@ -1,61 +1,53 @@
-{{ if .Values.postgresMainDB.enabled }}
-# Source: airflow/charts/postgresql/templates/statefulset.yaml
+
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: "postgresql-maindb-{{ .Release.Namespace }}"
-  namespace: "{{ .Release.Namespace }}"
+  name: "postgresql-maindb"
+  namespace: "maindb"
   labels:
-    app: "postgresql-maindb-{{ .Release.Namespace }}"
+    app: "postgresql-maindb"
 spec:
-  serviceName: postgresql-maindb-headless-{{ .Release.Namespace }}
+  serviceName: postgresql-headless-maindb
   replicas: 1
   updateStrategy:
     type: RollingUpdate
   selector:
     matchLabels:
-      app: "postgresql-maindb-{{ .Release.Namespace }}"
+      app: "postgresql-maindb"
   template:
     metadata:
-      name: "postgresql-maindb-{{ .Release.Namespace }}"
+      name: "postgresql-maindb"
       labels:
-        app: "postgresql-maindb-{{ .Release.Namespace }}"
+        app: "postgresql-maindb"
     spec:
       containers:
-        - name: postgresql-maindb-{{ .Release.Namespace }}
-          image: docker.io/bitnami/postgresql:11.12.0-debian-10-r44
+        - name: postgresql-maindb
+          image: postgres:15.3
           imagePullPolicy: "IfNotPresent"
           resources:
-{{ toYaml .Values.postgres.resources | indent 12 }}
           env:
-            - name: BITNAMI_DEBUG
-              value: "false"
             - name: POSTGRESQL_PORT_NUMBER
-              value: "5678"
-            - name: POSTGRESQL_VOLUME_DIR
-              value: "/bitnami/postgresql"
-            - name: PGDATA
-              value: "/bitnami/postgresql/data"
+              value: "5432"
             - name: POSTGRES_USER
               value: "postgres"
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgresql-maindb-{{ .Release.Namespace }}-password
-                  key: postgresql-maindb-password
+                  name: postgresql-maindb-password
+                  key: postgresql-password
             - name: POSTGRES_DB
               value: "airflow"
             - name: POSTGRESQL_ENABLE_LDAP
               value: "no"
           ports:
-            - name: tcp-postgresql
-              containerPort: 5678
+            - name: airflow
+              containerPort: 5432
           livenessProbe:
             exec:
               command:
                 - /bin/sh
                 - -c
-                - exec pg_isready -U "postgres" -d "{{ .Release.Namespace }}-airflow" -h 127.0.0.1 -p 5678
+                - exec pg_isready -U "postgres" -d "airflow" -h 127.0.0.1 -p 5432
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
@@ -68,11 +60,10 @@ spec:
                 - -c
                 - -e
                 - |
-                  exec pg_isready -U "postgres" -d "{{ .Release.Namespace }}-airflow" -h 127.0.0.1 -p 5678
+                  exec pg_isready -U "postgres" -d "airflow" -h 127.0.0.1 -p 5432
                   [ -f /opt/bitnami/postgresql/tmp/.initialized ] || [ -f /bitnami/postgresql/.initialized ]
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
             successThreshold: 1
             failureThreshold: 6
-{{ end }}

@@ -41,7 +41,7 @@ spec:
         []
       topologySpreadConstraints:
         []
-      terminationGracePeriodSeconds: 60
+      terminationGracePeriodSeconds: 200
       restartPolicy: Always
       serviceAccountName: {{ .Chart.Name }}-{{ .Values.env }}
       securityContext:
@@ -63,8 +63,22 @@ spec:
             []
           env:
             {{- include "standard_airflow_environment" . | indent 10 }}
-      {{- include "git_sync_container" (dict "Values" .Values "is_init" "true" "Template" .Template) | nindent 8 }}
+      {{- include "git_sync_container" (dict "Values" .Values "is_init" "true") | nindent 8 }}
       containers:
+        - name: update-dag
+          image: alpine:latest
+          imagePullPolicy: Always
+          resources:
+            {{- toYaml .Values.updateDag.resources | nindent 12 }}
+          command:
+            - /scripts/update-dag.sh
+          securityContext:
+            runAsUser: 50000
+          volumeMounts:
+            - name: {{ .Chart.Name }}-update-dag
+              mountPath: /scripts
+            - name: dag-data
+              mountPath: /opt/airflow/data-pipeline
         - name: dag-processor
           image: {{ template "airflow_image" . }}
           imagePullPolicy: Never
@@ -89,7 +103,8 @@ spec:
               mountPath: "/opt/airflow/config/airflow_local_settings.py"
               subPath: airflow_local_settings.py
               readOnly: true
-            {{- include "airflow_dags_mount" . | nindent 12 }}
+            - name: dag-data
+              mountPath: /opt/airflow/data-pipeline
           envFrom:
             []
           env:
@@ -104,8 +119,8 @@ spec:
           livenessProbe:
             initialDelaySeconds: 10
             timeoutSeconds: 20
-            failureThreshold: 5
-            periodSeconds: 60
+            failureThreshold: 10
+            periodSeconds: 200
             exec:
               command:
                   - sh
@@ -114,11 +129,16 @@ spec:
                     CONNECTION_CHECK_MAX_COUNT=0 AIRFLOW__LOGGING__LOGGING_LEVEL=ERROR exec /entrypoint \
                     airflow jobs check
       volumes:
-        - name: dags
-          emptyDir: {}
+        - name: dag-data
+          persistentVolumeClaim:
+            claimName: "dag-data-{{ .Values.env }}-pvc"
         - name: logs
           emptyDir: {}
         - name: config
           configMap:
             name: {{ .Chart.Name }}-airflow-config-{{ .Values.env }}
+        - name: {{ .Chart.Name }}-update-dag
+          configMap:
+            name: {{ .Chart.Name }}-update-dag-{{ .Values.env }}
+            defaultMode: 0755
         {{- include "git_sync_ssh_key_volume" . | indent 8 }}
