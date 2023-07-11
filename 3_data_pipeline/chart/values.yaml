@@ -77,6 +77,11 @@ gitSync:
       cpu: ~
       memory: ~
 
+maindb:
+  enabled: ~
+  postgresPassword: ~
+  resources: {}
+
 # airflow metadata db in k8s cluster (postgres)
 postgres:
   enabled: ~

@@ -52,6 +52,17 @@ gitSync:
       cpu: 100m
       memory: 128Mi
 
+maindb:
+  enabled: true
+  postgresPassword: "production"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
 postgres:
   enabled: true
   postgresPassword: "production"

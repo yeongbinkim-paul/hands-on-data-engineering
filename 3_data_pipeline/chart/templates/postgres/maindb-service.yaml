@@ -1,0 +1,44 @@
+{{ if .Values.postgres.enabled }}
+# Source: airflow/charts/postgresql/templates/svc-headless.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: "maindb-psql-headless-{{ .Release.Namespace }}"
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+{{- with .Values.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: maindb-psql-{{ .Release.Namespace }}
+      port: 4321
+      targetPort: 4321
+  selector:
+    tier: maindb
+    component: postgres
+    release: {{ .Chart.Name }}
+---
+# Source: airflow/charts/postgresql/templates/svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: "maindb-psql-{{ .Release.Namespace }}"
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+{{- with .Values.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: maindb-psql-{{ .Release.Namespace }}
+      port: 4321
+      targetPort: 4321
+  selector:
+    tier: maindb
+    component: postgres
+    release: {{ .Chart.Name }}
+{{ end }}
