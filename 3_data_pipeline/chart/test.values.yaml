@@ -31,6 +31,7 @@ workers:
       memory: 2Gi
 
 webserver:
+  port: 8081
   resources:
     requests:
       cpu: 250m
@@ -151,7 +152,7 @@ airflowCfg: |-
   navbar_color =
   enable_proxy_fix = True
   rbac = True
-  web_server_port = 8081
+  web_server_port = {{ .Values.webserver.port }}
 
   [smart_sensor]
   use_smart_sensor = False

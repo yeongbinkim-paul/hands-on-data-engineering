@@ -104,7 +104,7 @@ spec:
               readOnly: true
           ports:
             - name: airflow-ui
-              containerPort: 8080
+              containerPort: {{ .Values.webserver.port }}
           envFrom:
             []
           env:
