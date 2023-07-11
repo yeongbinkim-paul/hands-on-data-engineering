@@ -16,10 +16,6 @@ data:
   airflow.cfg: |-
     {{ tpl .Values.airflowCfg . | nindent 4 }}
 {{- end }}
-{{- if .Values.webserverConfig }}
-  webserver_config.py: |
-    {{ tpl .Values.webserverConfig . | nindent 4 }}
-{{- end }}
 {{- if .Values.airflowLocalSettings }}
   airflow_local_settings.py: |
     {{ tpl .Values.airflowLocalSettings . | nindent 4 }}

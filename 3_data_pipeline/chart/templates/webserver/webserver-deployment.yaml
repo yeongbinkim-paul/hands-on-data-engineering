@@ -68,10 +68,6 @@ spec:
               mountPath: "/opt/airflow/config/airflow_local_settings.py"
               subPath: airflow_local_settings.py
               readOnly: true
-            - name: config
-              mountPath: "/opt/airflow/webserver_config.py"
-              subPath: webserver_config.py
-              readOnly: true
           args:
             - airflow
             - db
@@ -106,31 +102,9 @@ spec:
               mountPath: "/opt/airflow/config/airflow_local_settings.py"
               subPath: airflow_local_settings.py
               readOnly: true
-            - name: config
-              mountPath: "/opt/airflow/webserver_config.py"
-              subPath: webserver_config.py
-              readOnly: true
           ports:
             - name: airflow-ui
               containerPort: 8080
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 8080
-              scheme: HTTP
-            initialDelaySeconds: 15
-            timeoutSeconds: 5
-            failureThreshold: 5
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 8080
-              scheme: HTTP
-            initialDelaySeconds: 15
-            timeoutSeconds: 5
-            failureThreshold: 5
-            periodSeconds: 10
           envFrom:
             []
           env:

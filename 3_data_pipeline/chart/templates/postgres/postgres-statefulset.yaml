@@ -29,7 +29,7 @@ spec:
         fsGroup: 1001
       containers:
         - name: postgresql-{{ .Release.Namespace }}
-          image: {{ template "postgres_image" . }}
+          image: {{ include "postgres_image" . | quote }}
           imagePullPolicy: "IfNotPresent"
           securityContext:
             runAsUser: 1001

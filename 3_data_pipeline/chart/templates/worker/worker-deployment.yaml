@@ -136,7 +136,7 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: test-airflow-airflow-config
+            name: airflow-config-{{ .Values.env }}
   volumeClaimTemplates:
     - metadata:
         name: logs

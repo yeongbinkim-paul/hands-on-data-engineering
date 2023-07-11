@@ -1,5 +1,5 @@
 {{- define "airflow_db_conn" -}}
-{{ printf "postgresql://postgres:%s@postgresql-%s:5432/postgres?sslmode=False" .Values.postgres.postgresPassword .Release.Namespace }}
+{{ printf "postgresql://postgres:%s@postgresql-%s:5432/postgres?sslmode=disable" .Values.postgres.postgresPassword .Release.Namespace }}
 {{- end -}}
 
 {{- define "git_sync_image" -}}

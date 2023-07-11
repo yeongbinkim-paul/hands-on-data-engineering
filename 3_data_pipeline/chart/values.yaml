@@ -17,8 +17,8 @@ images:
     repository: redis
     tag: 7-bullseye
   postgres:
-    repository: docker.io/bitnami/postgresql
-    tag: 11
+    repository: "docker.io/bitnami/postgresql"
+    tag: "11"
 # default k8s object label
 labels:
   app: "data-pipeline"
