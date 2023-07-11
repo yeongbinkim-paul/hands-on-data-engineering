@@ -43,7 +43,7 @@ webserver:
 gitSync:
   enabled: true
   repo: https://github.com/yeongbinkim-paul/hands-on-data-engineering
-  branch: master
+  branch: main
   rev: HEAD
   subPath: 3_data_pipeline/dags
   resources:
