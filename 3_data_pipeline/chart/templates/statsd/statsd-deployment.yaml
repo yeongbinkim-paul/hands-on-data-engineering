@@ -20,8 +20,8 @@ spec:
     metadata:
       labels:
         tier: airflow
-      component: statsd
-      release: {{ .Chart.Name }}
+        component: statsd
+        release: {{ .Chart.Name }}
     spec:
       restartPolicy: Always
       terminationGracePeriodSeconds: 10
@@ -37,7 +37,12 @@ spec:
           args:
             - --statsd.mapping-config=/etc/statsd-exporter/mappings.yml
           resources:
-            {}
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
           ports:
             - name: statsd-ingest
               protocol: UDP

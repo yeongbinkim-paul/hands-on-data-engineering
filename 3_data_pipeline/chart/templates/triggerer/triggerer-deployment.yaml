@@ -2,7 +2,7 @@
 ## Airflow Triggerer Deployment
 #################################
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: {{ .Chart.Name }}-triggerer-{{ .Values.env }}
   namespace: "{{ .Release.Namespace }}"
@@ -11,7 +11,6 @@ metadata:
 {{ toYaml . | indent 4 }}
 {{- end }}
 spec:
-  serviceName: {{ .Chart.Name }}-triggerer-{{ .Values.env }}
   replicas: 1
   selector:
     matchLabels:

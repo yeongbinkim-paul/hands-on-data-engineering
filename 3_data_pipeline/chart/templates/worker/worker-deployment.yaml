@@ -50,7 +50,6 @@ spec:
         []
       terminationGracePeriodSeconds: 100
       restartPolicy: Always
-      serviceAccountName: {{ .Chart.Name }}-{{ .Values.env }}
       securityContext:
         runAsUser: 50000
         fsGroup: 0
@@ -107,9 +106,6 @@ spec:
               readOnly: true
             - name: dag-data
               mountPath: /opt/airflow/dags
-{{- if .Values.workers.isPersistence }}
-              subPath: "{{ .Release.Namespace }}"
-{{- end }}
               readOnly: true
           envFrom:
             []
@@ -138,8 +134,6 @@ spec:
             - name: logs
               mountPath: "/opt/airflow/logs"
       volumes:
-        - name: logs
-          emptyDir: {}
         - name: config
           configMap:
             name: test-airflow-airflow-config

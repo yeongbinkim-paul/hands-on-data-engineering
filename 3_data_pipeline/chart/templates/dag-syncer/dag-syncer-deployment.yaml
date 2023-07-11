@@ -72,7 +72,7 @@ spec:
             - name: GIT_SYNC_ONE_TIME
               value: "false"
           resources:
-            {{ toYaml .Values.gitSync.resources | nindent 10 }}
+            {{- toYaml .Values.gitSync.resources | nindent 12 }}
           volumeMounts:
               - name: gitsync-secret
                 mountPath: /etc/git-secret

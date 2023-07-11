@@ -12,8 +12,6 @@ metadata:
 spec:
   serviceName: postgresql-headless-{{ .Release.Namespace }}
   replicas: 1
-  updateStrategy:
-    type: RollingUpdate
   selector:
     matchLabels:
       tier: airflow
@@ -33,7 +31,6 @@ spec:
         - name: postgresql-{{ .Release.Namespace }}
           image: {{ template "postgres_image" . }}
           imagePullPolicy: "IfNotPresent"
-          serviceAccountName: {{ .Chart.Name }}-{{ .Values.env }}
           securityContext:
             runAsUser: 1001
           resources:

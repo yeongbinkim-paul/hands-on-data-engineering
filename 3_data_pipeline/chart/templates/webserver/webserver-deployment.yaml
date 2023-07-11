@@ -11,7 +11,6 @@ metadata:
 {{ toYaml . | indent 4 }}
 {{- end }}
 spec:
-  serviceName: {{ .Chart.Name }}-webserver-{{ .Values.env }}
   replicas: 1
   strategy:
     type: RollingUpdate
@@ -90,7 +89,8 @@ spec:
             - bash
             - -c
             - exec airflow webserver
-          resources: {{- toYaml .Values.webserver.resources | nindent 12 }}
+          resources:
+            {{- toYaml .Values.webserver.resources | nindent 12 }}
           volumeMounts:
             - name: logs
               mountPath: /opt/airflow/logs

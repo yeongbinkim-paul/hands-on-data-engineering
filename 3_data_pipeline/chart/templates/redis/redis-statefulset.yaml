@@ -13,8 +13,6 @@ metadata:
 spec:
   serviceName: "redis-{{ .Release.Namespace }}"
   replicas: 1
-  updateStrategy:
-    type: RollingUpdate
   selector:
     matchLabels:
       tier: airflow
@@ -30,7 +28,6 @@ spec:
       annotations:
         cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
     spec:
-      serviceAccountName: {{ .Chart.Name }}-{{ .Values.env }}
       securityContext:
         fsGroup: 1001
       containers:
