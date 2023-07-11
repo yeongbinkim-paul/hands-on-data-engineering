@@ -17,4 +17,4 @@ COPY requirements/airflow.txt airflow.txt
 RUN pip install --upgrade pip
 RUN pip install -r base.txt -c airflow.txt
 
-ENV PYTHONPATH='$PYTHONPATH:/opt/airflow/data-pipeline/'
+ENV PYTHONPATH='$PYTHONPATH:/opt/airflow/dags'

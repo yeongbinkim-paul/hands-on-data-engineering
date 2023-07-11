@@ -1,0 +1,68 @@
+################################
+## Airflow StatsD Deployment
+#################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "statsd-{{ .Release.Namespace }}"
+  labels:
+{{- with .Values.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      tier: airflow
+      component: statsd
+      release: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        tier: airflow
+      component: statsd
+      release: {{ .Chart.Name }}
+    spec:
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 10
+      serviceAccountName: {{ .Chart.Name }}-{{ .Values.env }}
+      securityContext:
+        runAsUser: 50000
+        fsGroup: 0
+      containers:
+        - name: statsd
+          image: {{ template "statsd_image" . }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+          args:
+            - --statsd.mapping-config=/etc/statsd-exporter/mappings.yml
+          resources:
+            {}
+          ports:
+            - name: statsd-ingest
+              protocol: UDP
+              containerPort: 9125
+            - name: statsd-scrape
+              containerPort: 9102
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 9102
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 9102
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/statsd-exporter/mappings.yml
+              subPath: mappings.yml
+      volumes:
+        - name: config
+          configMap:
+            name: statsd-config-{{ .Values.env }}

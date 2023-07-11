@@ -6,7 +6,9 @@ metadata:
   name: "postgresql-{{ .Release.Namespace }}"
   namespace: "{{ .Release.Namespace }}"
   labels:
-    app: "postgresql-{{ .Release.Namespace }}"
+{{- with .Values.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
 spec:
   serviceName: postgresql-headless-{{ .Release.Namespace }}
   replicas: 1
@@ -14,59 +16,71 @@ spec:
     type: RollingUpdate
   selector:
     matchLabels:
-      app: "postgresql-{{ .Release.Namespace }}"
+      tier: airflow
+      component: postgres
+      release: {{ .Chart.Name }}
   template:
     metadata:
       name: "postgresql-{{ .Release.Namespace }}"
       labels:
-        app: "postgresql-{{ .Release.Namespace }}"
+        tier: airflow
+        component: postgres
+        release: {{ .Chart.Name }}
     spec:
+      securityContext:
+        fsGroup: 1001
       containers:
         - name: postgresql-{{ .Release.Namespace }}
-          image: postgres:15.3
+          image: {{ template "postgres_image" . }}
           imagePullPolicy: "IfNotPresent"
+          serviceAccountName: {{ .Chart.Name }}-{{ .Values.env }}
+          securityContext:
+            runAsUser: 1001
           resources:
 {{ toYaml .Values.postgres.resources | indent 12 }}
           env:
+            - name: BITNAMI_DEBUG
+              value: "false"
             - name: POSTGRESQL_PORT_NUMBER
               value: "5432"
-            - name: POSTGRES_USER
-              value: "postgres"
+            - name: POSTGRESQL_VOLUME_DIR
+              value: "/bitnami/postgresql"
+            - name: PGDATA
+              value: "/bitnami/postgresql/data"
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: postgresql-{{ .Release.Namespace }}-password
                   key: postgresql-password
-            - name: POSTGRES_DB
-              value: "airflow"
             - name: POSTGRESQL_ENABLE_LDAP
               value: "no"
           ports:
             - name: airflow
               containerPort: 5432
           livenessProbe:
+            failureThreshold: 6
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
             exec:
               command:
                 - /bin/sh
                 - -c
-                - exec pg_isready -U "postgres" -d "airflow" -h 127.0.0.1 -p 5432
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
-            successThreshold: 1
-            failureThreshold: 6
+                - exec pg_isready -U "postgres" -h 127.0.0.1 -p 5432
+
           readinessProbe:
+            failureThreshold: 6
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
             exec:
               command:
                 - /bin/sh
                 - -c
                 - -e
                 - |
-                  exec pg_isready -U "postgres" -d "airflow" -h 127.0.0.1 -p 5432
+                  exec pg_isready -U "postgres" -h 127.0.0.1 -p 5432
                   [ -f /opt/bitnami/postgresql/tmp/.initialized ] || [ -f /bitnami/postgresql/.initialized ]
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 5
-            successThreshold: 1
-            failureThreshold: 6
 {{ end }}

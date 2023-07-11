@@ -1,0 +1,160 @@
+################################
+## Airflow Worker Deployment
+#################################
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Chart.Name }}-worker-{{ .Values.env }}
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+{{- with .Values.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  replicas: 4
+  serviceName: {{ .Chart.Name }}-worker
+  selector:
+    matchLabels:
+      tier: airflow
+      component: worker
+      release: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        tier: airflow
+        component: worker
+        release: {{ .Chart.Name }}
+      annotations:
+        checksum/metadata-secret: eaff6fb1d6aed278ad89066c4207aceb5344352de9cd20731b919da9348c179e
+        checksum/result-backend-secret: 98a68f230007cfa8f5d3792e1aff843a76b0686409e4a46ab2f092f6865a1b71
+        checksum/pgbouncer-config-secret: 1dae2adc757473469686d37449d076b0c82404f61413b58ae68b3c5e99527688
+        checksum/webserver-secret-key: 96f7ffb4f331ab002fb00f340c5e316731d13786d9907cc3d384a1136dfd65b6
+        checksum/kerberos-keytab: 80979996aa3c1f48c95dfbe9bb27191e71f12442a08c0ed834413da9d430fd0e
+        checksum/airflow-config: e68ea1b15763bb1cc093a97c7da1f57ee493e4a846228e6075da7c9a111b2613
+        checksum/extra-configmaps: e862ea47e13e634cf17d476323784fa27dac20015550c230953b526182f5cac8
+        checksum/extra-secrets: e9582fdd622296c976cbc10a5ba7d6702c28a24fe80795ea5b84ba443a56c827
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  component: worker
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      tolerations:
+        []
+      topologySpreadConstraints:
+        []
+      terminationGracePeriodSeconds: 100
+      restartPolicy: Always
+      serviceAccountName: {{ .Chart.Name }}-{{ .Values.env }}
+      securityContext:
+        runAsUser: 50000
+        fsGroup: 0
+      initContainers:
+        - name: wait-for-airflow-migrations
+          resources:
+            {}
+          image: {{ template "airflow_image" . }}
+          imagePullPolicy: Never
+          args:
+            - airflow
+            - db
+            - check-migrations
+            - --migration-wait-timeout=60
+          envFrom:
+            []
+          env:
+          {{- include "standard_airflow_environment" . | nindent 10 }}
+      containers:
+        - name: worker
+          image: {{ template "airflow_image" . }}
+          imagePullPolicy: Never
+          args:
+            - bash
+            - -c
+            - |-
+              exec \
+              airflow celery worker
+          resources:
+            {{- toYaml .Values.workers.resources | nindent 12 }}
+          livenessProbe:
+            initialDelaySeconds: 10
+            timeoutSeconds: 20
+            failureThreshold: 5
+            periodSeconds: 60
+            exec:
+              command:
+                - sh
+                - -c
+                - CONNECTION_CHECK_MAX_COUNT=0 exec /entrypoint python -m celery --app airflow.executors.celery_executor.app inspect ping -d celery@$(hostname)
+          ports:
+            - name: worker-logs
+              containerPort: 8793
+          volumeMounts:
+            - name: logs
+              mountPath: "/opt/airflow/logs"
+            - name: config
+              mountPath: "/opt/airflow/airflow.cfg"
+              subPath: airflow.cfg
+              readOnly: true
+            - name: config
+              mountPath: "/opt/airflow/config/airflow_local_settings.py"
+              subPath: airflow_local_settings.py
+              readOnly: true
+            - name: dag-data
+              mountPath: /opt/airflow/dags
+{{- if .Values.workers.isPersistence }}
+              subPath: "{{ .Release.Namespace }}"
+{{- end }}
+              readOnly: true
+          envFrom:
+            []
+          env:
+            - name: AIRFLOW__METRICS__STATSD_PORT
+              value: "8125"
+            - name: AIRFLOW__METRICS__STATSD_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: DUMB_INIT_SETSID
+              value: "0"
+            {{- include "standard_airflow_environment" . | indent 10 }}
+        - name: worker-log-groomer
+          image: {{ template "airflow_image" . }}
+          imagePullPolicy: Never
+          args:
+            - bash
+            - /clean-logs
+          env:
+            - name: AIRFLOW__LOG_RETENTION_DAYS
+              value: "15"
+          resources:
+            {}
+          volumeMounts:
+            - name: logs
+              mountPath: "/opt/airflow/logs"
+      volumes:
+        - name: logs
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: test-airflow-airflow-config
+  volumeClaimTemplates:
+    - metadata:
+        name: logs
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
+    - metadata:
+        name: dag-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 512Mi

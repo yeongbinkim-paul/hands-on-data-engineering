@@ -1,0 +1,23 @@
+################################
+## Airflow Worker Service
+#################################
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ .Chart.Name }}-worker-{{ .Values.env }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+{{- with .Values.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  clusterIP: None
+  selector:
+    tier: airflow
+    component: worker
+    release: {{ .Chart.Name | quote }}
+  ports:
+    - name: worker-logs
+      protocol: TCP
+      port: 8793
+      targetPort: 8793

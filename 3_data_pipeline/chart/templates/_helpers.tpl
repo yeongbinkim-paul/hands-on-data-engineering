@@ -1,95 +1,61 @@
-{{- define "airflow_dags_folder" -}}
-/opt/airflow
+{{- define "airflow_db_conn" -}}
+{{ printf "postgresql://postgres:%s@postgresql-%s:5432/postgres?sslmode=False" .Values.postgres.postgresPassword .Release.Namespace }}
 {{- end -}}
 
 {{- define "git_sync_image" -}}
 {{ printf "%s:%s" .Values.images.gitSync.repository .Values.images.gitSync.tag }}
 {{- end -}}
 
-{{- define "airflow_db_conn" -}}
-{{ printf "postgresql://postgres:%s@postgresql-%s:5432/airflow" .Values.postgres.postgresPassword .Release.Namespace }}
-{{- end -}}
-
 {{- define "airflow_image" -}}
-{{ printf "%s:%s" .Values.images.airflow.repository .Values.images.airflow.tag | quote }}
+{{ printf "%s:%s" .Values.images.airflow.repository .Values.images.airflow.tag }}
 {{- end -}}
 
-{{- define "pod_template_image" -}}
-{{ printf "%s:%s" .Values.images.airflow.repository .Values.images.airflow.tag | quote }}
+{{- define "redis_image" -}}
+{{ printf "%s:%s" .Values.images.redis.repository .Values.images.redis.tag }}
+{{- end -}}
+
+{{- define "postgres_image" -}}
+{{ printf "%s:%s" .Values.images.postgres.repository .Values.images.postgres.tag }}
+{{- end -}}
+
+{{- define "statsd_image" -}}
+{{ printf "%s:%s" .Values.images.statsd.repository .Values.images.statsd.tag }}
 {{- end -}}
 
 {{- define "airflow_liveness_probe_path" -}}
 /health
 {{- end -}}
 
-
 {{/* Standard Airflow environment variables */}}
 {{- define "standard_airflow_environment" }}
   - name: AIRFLOW__CORE__FERNET_KEY
     valueFrom:
       secretKeyRef:
-        name: {{ .Chart.Name }}-fernet-key-{{ .Values.env }}
+        name: fernet-key
         key: fernet-key
   - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
-    value: {{ template "airflow_db_conn" . }}
+    valueFrom:
+      secretKeyRef:
+        name: airflow-metadata
+        key: connection
   - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
-    value: {{ template "airflow_db_conn" . }}
+    valueFrom:
+      secretKeyRef:
+        name: airflow-metadata
+        key: connection
   - name: AIRFLOW_CONN_AIRFLOW_DB
-    value: {{ template "airflow_db_conn" . }}
+    valueFrom:
+      secretKeyRef:
+        name: airflow-metadata
+        key: connection
   - name: AIRFLOW__WEBSERVER__SECRET_KEY
-    value: b46f1a10f3eed7a79540729f34a7da37
-{{- end -}}
-
-{{- define "extra_airflow_environment" }}
-  {{ if eq .Values.env "test" }}
-  - name: ENVIRONMENT
-    value: "test"
-  - name: IS_TEST
-    value: "true"
-  {{ else }}
-  - name: ENVIRONMENT
-    value: "production"
-  - name: IS_TEST
-    value: "false"
-  {{ end }}
-  - name: NAMESPACE
-    value: {{ .Release.Namespace | quote }}
-{{- end -}}
-
-{{/*  Git ssh key volume */}}
-{{- define "git_sync_ssh_key_volume" }}
-- name: git-sync-secret
-  secret:
-    secretName: airflow-git-ssh-secret-{{ .Values.env }}
-{{- end -}}
-
-{{/*  Git sync container */}}
-{{- define "git_sync_container" }}
-- name: git-sync-container
-  image: {{ template "git_sync_image" . }}
-  imagePullPolicy: {{ .Values.images.gitSync.pullPolicy }}
-  securityContext:
-    runAsUser: 50000
-  env:
-    - name: GIT_SSH_KEY_FILE
-      value: "/etc/git-secret/ssh"
-    - name: GIT_SYNC_SSH
-      value: "true"
-    - name: GIT_KNOWN_HOSTS
-      value: "true"
-    - name: GIT_SSH_KNOWN_HOSTS_FILE
-      value: "/etc/git-secret/known_hosts"
-    - name: GIT_SYNC_BRANCH
-      value: {{ .Values.gitSync.branch | quote }}
-    - name: GIT_SYNC_REPO
-      value: {{ .Values.gitSync.repo | quote }}
-    - name: GIT_SYNC_ROOT
-      value: "/opt/airflow/data-pipeline/"
-    - name: GIT_SYNC_ONE_TIME
-      value: "true"
-  resources: {{ toYaml .Values.gitSync.resources | nindent 6 }}
-  volumeMounts:
-    - name: git-sync-secret
-      mountPath: /etc/git-secret
-      readOnly: true
+    valueFrom:
+      secretKeyRef:
+        name: webserver-key
+        key: webserver-key
+  - name: AIRFLOW__CELERY__BROKER_URL
+    valueFrom:
+      secretKeyRef:
+        name: broker-url
+        key: connection
 {{- end -}}

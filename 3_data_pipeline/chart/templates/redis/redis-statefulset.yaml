@@ -1,0 +1,65 @@
+################################
+## Airflow Redis StatefulSet
+#################################
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: "redis-{{ .Release.Namespace }}"
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+{{- with .Values.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  serviceName: "redis-{{ .Release.Namespace }}"
+  replicas: 1
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      tier: airflow
+      component: redis
+      release: {{ .Chart.Name }}
+  template:
+    metadata:
+      name: "redis-{{ .Release.Namespace }}"
+      labels:
+        tier: airflow
+        component: redis
+        release: {{ .Chart.Name }}
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+    spec:
+      serviceAccountName: {{ .Chart.Name }}-{{ .Values.env }}
+      securityContext:
+        fsGroup: 1001
+      containers:
+        - name: redis
+          image: {{ template "redis_image" . }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 1001
+          command: ["/bin/sh"]
+          resources:
+            {}
+          args: ["-c", "redis-server --requirepass ${REDIS_PASSWORD}"]
+          ports:
+            - name: redis-db
+              containerPort: 6379
+          volumeMounts:
+            - name: redis-db
+              mountPath: /data
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-{{ .Release.Namespace }}-password
+                  key: redis-password
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-db
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi

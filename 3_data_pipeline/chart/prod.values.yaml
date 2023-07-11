@@ -1,20 +1,5 @@
 env: "prod"
 
-images:
-  airflow:
-    repository: ~
-    tag: ~
-
-dagProcessor:
-  enabled: true
-  resources:
-    requests:
-      cpu: 1000m
-      memory: 1Gi
-    limits:
-      cpu: 1000m
-      memory: 1Gi
-
 scheduler:
   resources:
     requests:
@@ -25,7 +10,7 @@ scheduler:
       memory: 2Gi
 
 triggerer:
-  enabled: false
+  enabled: true
   resources:
     requests:
       cpu: 100m
@@ -33,6 +18,17 @@ triggerer:
     limits:
       cpu: 100m
       memory: 1Gi
+
+workers:
+  enabled: true
+  replica: 4
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
 
 webserver:
   resources:
@@ -48,18 +44,7 @@ gitSync:
   repo: https://github.com/yeongbinkim-paul/hands-on-data-engineering
   branch: master
   rev: HEAD
-  depth: 1
   subPath: 3_data_pipeline/dags
-  sshKeySecret: airflow-git-ssh-secret
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 100m
-      memory: 128Mi
-
-updateDag:
   resources:
     requests:
       cpu: 100m
@@ -79,18 +64,24 @@ postgres:
       cpu: 200m
       memory: 256Mi
 
-createUserJob:
-  enabled: true
-
 airflowCfg: |-
+  [celery]
+  worker_concurrency = 16
+  worker_autoscale = 24,16
+  operation_timeout = 3.0
+  flower_basic_auth = admin:admin
+
+  [celery_kubernetes_executor]
+  kubernetes_queue = kubernetes
+
   [core]
   min_serialized_dag_update_interval = 30
   min_serialized_dag_fetch_interval = 10
   max_num_rendered_ti_fields_per_task = 30
 
   colored_console_log = False
-  dags_folder = {{ template "airflow_dags_folder" . }}
-  executor = KubernetesExecutor
+  dags_folder = /opt/airflow/dags
+  executor = CeleryKubernetesExecutor
   load_examples = False
   parallelism = 10000
   dagbag_import_timeout = 300
@@ -102,9 +93,24 @@ airflowCfg: |-
   sql_alchemy_max_overflow = -1
   sql_alchemy_pool_size = 0
 
+  [elasticsearch]
+  json_format = True
+  log_id_template = {dag_id}_{task_id}_{execution_date}_{try_number}
+
+  [elasticsearch_configs]
+  max_retries = 3
+  retry_timeout = True
+  timeout = 30
+
+  [kerberos]
+  ccache = /var/kerberos-ccache/cache
+  keytab = /etc/airflow.keytab
+  principal = airflow@FOO.COM
+  reinit_frequency = 3600
+
   [kubernetes]
-  airflow_configmap = {{ .Chart.Name }}-airflow-config-{{ .Values.env }}
-  airflow_local_settings_configmap = {{ .Chart.Name }}-airflow-config-{{ .Values.env }}
+  airflow_configmap = {{ .Chart.Name }}-airflow-config
+  airflow_local_settings_configmap = {{ .Chart.Name }}-airflow-config
   multi_namespace_mode = False
 
   namespace = {{ .Release.Namespace }}
@@ -122,12 +128,14 @@ airflowCfg: |-
   colored_console_log = True
 
   [metrics]
+  statsd_host = airflow-statsd
   statsd_on = True
+  statsd_port = 9125
   statsd_prefix = airflow
 
   [scheduler]
-  standalone_dag_processor = True
-  scheduler_zombie_task_threshold = 300
+  standalone_dag_processor = False
+  scheduler_zombie_task_threshold = 100
   schedule_after_task_execution = True
   run_duration = 41460
   scheduler_heartbeat_sec = 2
@@ -135,39 +143,27 @@ airflowCfg: |-
   scheduler_health_check_threshold = 200
   killed_task_cleanup_time = 10
   max_dagruns_per_loop_to_schedule = 2000
+  statsd_host = airflow-statsd
+  statsd_on = True
+  statsd_port = 9125
+  statsd_prefix = airflow
 
   [webserver]
   navbar_color =
   enable_proxy_fix = True
   rbac = True
 
-  base_url = http://localhost:5554
-
   [smart_sensor]
   use_smart_sensor = False
 
-webserverConfig: |-
-  """Default configuration for the Airflow webserver"""
-  import os
-
-  from airflow.www.fab_security.manager import AUTH_OAUTH
-  from airflow.www.security import AirflowSecurityManager
-  import logging
-  from typing import Dict, Any, List, Union
-  import os
-
-  log = logging.getLogger(__name__)
-  log.setLevel(os.getenv("AIRFLOW__LOGGING__FAB_LOGGING_LEVEL", "INFO"))
-
-  FAB_ADMIN_ROLE = "Admin"
-  DATA_ENGINEERING = 1
+webserver_config.py: ~
 
 airflowLocalSettings: |-
   from airflow.www.utils import UIAlert
 
   DASHBOARD_UIALERTS = [
       UIAlert(
-        'This is Production Environment! Welcome!',
+        'Paul Data pipeline from hands on data engineering',
         roles=["Admin"],
         html=True,
       )
@@ -200,8 +196,7 @@ podTemplate: |
             value: LocalExecutor
           # Hard Coded Airflow Envs
         {{- include "standard_airflow_environment" . | nindent 6 }}
-        {{- include "extra_airflow_environment" . | nindent 6 }}
-        image: {{ template "pod_template_image" . }}
+        image: {{ template "airflow_image" . }}
         imagePullPolicy: IfNotPresent
         name: base
         ports: []
@@ -219,16 +214,14 @@ podTemplate: |
             subPath: airflow_local_settings.py
             readOnly: true
           - name: dag-data
-            mountPath: /opt/airflow/{{ .Chart.Name }}
-            subPath: {{ .Release.Namespace | quote }}
-            readOnly: True
+            mountPath: /opt/airflow/dags
+            readOnly: true
     hostNetwork: false
     restartPolicy: Never
     securityContext:
       runAsUser: 50000
       fsGroup: 0
     nodeSelector:
-      #<labelname>:value
       {}
     affinity:
       podAntiAffinity:
@@ -246,5 +239,8 @@ podTemplate: |
     - emptyDir: {}
       name: logs
     - configMap:
-        name: {{ .Chart.Name }}-airflow-config-{{ .Values.env }}
+        name: airflow-config-{{ .Values.env }}
       name: config
+    - name: dag-data
+      persistentVolumeClaim:
+        claimName: "dag-syncer-pvc-{{ .Values.env }}"

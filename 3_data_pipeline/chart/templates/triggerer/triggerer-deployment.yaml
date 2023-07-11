@@ -1,55 +1,56 @@
 ################################
-## Airflow Webserver Deployment
+## Airflow Triggerer Deployment
 #################################
-kind: Deployment
 apiVersion: apps/v1
+kind: StatefulSet
 metadata:
-  name: {{ .Chart.Name }}-webserver-{{ .Values.env }}
+  name: {{ .Chart.Name }}-triggerer-{{ .Values.env }}
   namespace: "{{ .Release.Namespace }}"
   labels:
 {{- with .Values.labels }}
 {{ toYaml . | indent 4 }}
 {{- end }}
 spec:
-  serviceName: {{ .Chart.Name }}-webserver-{{ .Values.env }}
+  serviceName: {{ .Chart.Name }}-triggerer-{{ .Values.env }}
   replicas: 1
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
   selector:
     matchLabels:
       tier: airflow
-      component: webserver
+      component: triggerer
       release: {{ .Chart.Name }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 50%
   template:
     metadata:
       labels:
         tier: airflow
-        component: webserver
+        component: triggerer
         release: {{ .Chart.Name }}
       annotations:
         checksum/metadata-secret: eaff6fb1d6aed278ad89066c4207aceb5344352de9cd20731b919da9348c179e
         checksum/pgbouncer-config-secret: 1dae2adc757473469686d37449d076b0c82404f61413b58ae68b3c5e99527688
-        checksum/webserver-secret-key: 4e95618168092fc85963f826a3330155ec1a2a7585a77ee456af77a1c4a3e190
         checksum/airflow-config: e68ea1b15763bb1cc093a97c7da1f57ee493e4a846228e6075da7c9a111b2613
-        checksum/webserver-config: 2f3fdfd294a37094d2abee43b2b09888a5c195ee03414996bf99a4681658af94
         checksum/extra-configmaps: e862ea47e13e634cf17d476323784fa27dac20015550c230953b526182f5cac8
         checksum/extra-secrets: e9582fdd622296c976cbc10a5ba7d6702c28a24fe80795ea5b84ba443a56c827
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
     spec:
       serviceAccountName: {{ .Chart.Name }}-{{ .Values.env }}
+      nodeSelector:
+        {}
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
           - podAffinityTerm:
               labelSelector:
                 matchLabels:
-                  component: webserver
+                  component: triggerer
               topologyKey: kubernetes.io/hostname
             weight: 100
       tolerations:
         []
+      terminationGracePeriodSeconds: 60
       restartPolicy: Always
       securityContext:
         runAsUser: 50000
@@ -69,35 +70,28 @@ spec:
               mountPath: "/opt/airflow/config/airflow_local_settings.py"
               subPath: airflow_local_settings.py
               readOnly: true
-            - name: config
-              mountPath: "/opt/airflow/webserver_config.py"
-              subPath: webserver_config.py
-              readOnly: true
           args:
             - airflow
             - db
             - check-migrations
-            - --migration-wait-timeout=180
+            - --migration-wait-timeout=60
           envFrom:
             []
           env:
             {{- include "standard_airflow_environment" . | indent 10 }}
       containers:
-        - name: webserver
+        - name: triggerer
           image: {{ template "airflow_image" . }}
           imagePullPolicy: Never
           args:
             - bash
             - -c
-            - exec airflow webserver
-          resources: {{- toYaml .Values.webserver.resources | nindent 12 }}
+            - exec airflow triggerer
+          resources:
+            {{- toYaml .Values.triggerer.resources | nindent 12 }}
           volumeMounts:
             - name: logs
-              mountPath: /opt/airflow/logs
-            - name: config
-              mountPath: /opt/airflow/pod_templates/pod_template_file.yaml
-              subPath: pod_template_file.yaml
-              readOnly: true
+              mountPath: "/opt/airflow/logs"
             - name: config
               mountPath: "/opt/airflow/airflow.cfg"
               subPath: airflow.cfg
@@ -106,38 +100,54 @@ spec:
               mountPath: "/opt/airflow/config/airflow_local_settings.py"
               subPath: airflow_local_settings.py
               readOnly: true
-            - name: config
-              mountPath: "/opt/airflow/webserver_config.py"
-              subPath: webserver_config.py
+            - name: dag-data
+              mountPath: /opt/airflow/dags
               readOnly: true
-          ports:
-            - name: airflow-ui
-              containerPort: 8080
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 8080
-              scheme: HTTP
-            initialDelaySeconds: 15
-            timeoutSeconds: 5
-            failureThreshold: 5
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 8080
-              scheme: HTTP
-            initialDelaySeconds: 15
-            timeoutSeconds: 5
-            failureThreshold: 5
-            periodSeconds: 10
           envFrom:
             []
           env:
+            - name: AIRFLOW__METRICS__STATSD_PORT
+              value: "8125"
+            - name: AIRFLOW__METRICS__STATSD_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
             {{- include "standard_airflow_environment" . | nindent 10 }}
+          livenessProbe:
+            initialDelaySeconds: 10
+            timeoutSeconds: 20
+            failureThreshold: 5
+            periodSeconds: 60
+            exec:
+              command:
+                - sh
+                - -c
+                - |
+                  CONNECTION_CHECK_MAX_COUNT=0 AIRFLOW__LOGGING__LOGGING_LEVEL=ERROR exec /entrypoint \
+                  airflow jobs check --job-type TriggererJob --local
+          ports:
+            - name: triggerer-logs
+              containerPort: 8794
+        - name: triggerer-log-groomer
+          resources:
+            {}
+          image: {{ template "airflow_image" . }}
+          imagePullPolicy: Never
+          args:
+            - bash
+            - /clean-logs
+          env:
+            - name: AIRFLOW__LOG_RETENTION_DAYS
+              value: "15"
+          volumeMounts:
+            - name: logs
+              mountPath: "/opt/airflow/logs"
       volumes:
         - name: logs
           emptyDir: {}
         - name: config
           configMap:
             name: airflow-config-{{ .Values.env }}
+        - name: dag-data
+          persistentVolumeClaim:
+            claimName: "dag-syncer-pvc-{{ .Values.env }}"

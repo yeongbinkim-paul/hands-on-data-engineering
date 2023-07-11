@@ -24,7 +24,7 @@ spec:
         {}
       tolerations:
         []
-      serviceAccountName: {{ .Chart.Name }}-{{ .Values.env }}
+      serviceAccountName: "{{ .Chart.Name }}-{{ .Values.env }}"
       containers:
         - name: run-airflow-migrations
           image: {{ template "airflow_image" . }}
@@ -45,12 +45,16 @@ spec:
               mountPath: "/opt/airflow/airflow.cfg"
               subPath: airflow.cfg
               readOnly: true
+            - name: config
+              mountPath: "/opt/airflow/config/airflow_local_settings.py"
+              subPath: airflow_local_settings.py
+              readOnly: true
           resources:
             {}
       volumes:
         - name: config
           configMap:
-            name: {{ .Chart.Name }}-airflow-config-{{ .Values.env }}
+            name: airflow-config-{{ .Values.env }}
 ---
 ################################
 ## Airflow Create User Job
@@ -70,7 +74,7 @@ spec:
       labels:
         tier: airflow
         component: create-user-job
-        release: {{ .Chart.Name | quote }}
+        release: {{ .Chart.Name }}
     spec:
       securityContext:
           runAsUser: 50000
@@ -112,9 +116,13 @@ spec:
               mountPath: "/opt/airflow/airflow.cfg"
               subPath: airflow.cfg
               readOnly: true
+            - name: config
+              mountPath: "/opt/airflow/config/airflow_local_settings.py"
+              subPath: airflow_local_settings.py
+              readOnly: true
           resources:
             {}
       volumes:
         - name: config
           configMap:
-            name: {{ .Chart.Name }}-airflow-config-{{ .Values.env }}
+            name: airflow-config-{{ .Values.env }}

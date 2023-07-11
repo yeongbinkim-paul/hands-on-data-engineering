@@ -3,36 +3,25 @@ env: ~
 # image of airflow
 images:
   airflow:
-    repository: "data_undercurrents/airflow"
-    tag: "1.0.0"
+    repository: data_undercurrents/airflow
+    tag: 1.0.0
   statsd:
     repository: quay.io/prometheus/statsd-exporter
     tag: v0.22.8
-    pullPolicy: IfNotPresent
-  pgbouncer:
-    repository: apache/airflow
-    tag: airflow-pgbouncer-2023.02.24-1.16.1
-    pullPolicy: IfNotPresent
-  pgbouncerExporter:
-    repository: apache/airflow
-    tag: airflow-pgbouncer-exporter-2023.02.21-0.14.0
     pullPolicy: IfNotPresent
   gitSync:
     repository: registry.k8s.io/git-sync/git-sync
     tag: v3.6.8
     pullPolicy: IfNotPresent
+  redis:
+    repository: redis
+    tag: 7-bullseye
+  postgres:
+    repository: docker.io/bitnami/postgresql
+    tag: 11
 # default k8s object label
 labels:
   app: "data-pipeline"
-
-# dag file processor
-dagProcessor:
-  # Whether the dag processor is running as a standalone process or it is a subprocess of a scheduler job.
-  enabled: ~
-  resources: {}
-  updateDag:
-    resources: ~
-  annotations: {}
 
 scheduler:
   resources:
@@ -54,7 +43,17 @@ triggerer:
       cpu: ~
       memory: ~
 
-# airflow config
+workers:
+  enabled: ~
+  replica: ~
+  resources:
+    requests:
+      cpu: ~
+      memory: ~
+    limits:
+      cpu: ~
+      memory: ~
+
 webserver:
   ingress:
     name: ~
@@ -77,8 +76,6 @@ gitSync:
   depth: ~
   maxFailures: ~
   subPath: ~
-
-updateDag:
   resources:
     requests:
       cpu: ~
@@ -86,15 +83,12 @@ updateDag:
     limits:
       cpu: ~
       memory: ~
+
 # airflow metadata db in k8s cluster (postgres)
 postgres:
   enabled: ~
   postgresPassword: ~
   resources: {}
-
-# Airflow job to create a user settings for the webserver
-createUserJob:
-  enabled: ~
 
 # airflow.cfg
 # https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html

@@ -28,6 +28,8 @@ spec:
         component: scheduler
         release: {{ .Chart.Name }}
     spec:
+      nodeSelector:
+        {}
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -37,11 +39,9 @@ spec:
                   component: scheduler
               topologyKey: kubernetes.io/hostname
             weight: 100
-      {{- with .Values.scheduler.nodeSelector }}
-      nodeSelector:
-        {{ toYaml . }}
-      {{- end }}
       tolerations:
+        []
+      topologySpreadConstraints:
         []
       restartPolicy: Always
       terminationGracePeriodSeconds: 10
@@ -49,7 +49,6 @@ spec:
       securityContext:
         runAsUser: 50000
         fsGroup: 0
-        fsGroupChangePolicy: "OnRootMismatch"
       initContainers:
         - name: wait-for-airflow-migrations
           resources:
@@ -74,8 +73,6 @@ spec:
             []
           env:
             {{- include "standard_airflow_environment" . | indent 10 }}
-
-
       containers:
         - name: scheduler
           image: {{ template "airflow_image" . }}
@@ -89,14 +86,13 @@ spec:
           envFrom:
             []
           env:
-            {{- include "standard_airflow_environment" . | indent 10 }}
-            {{- include "extra_airflow_environment" . | indent 10 }}
             - name: AIRFLOW__METRICS__STATSD_PORT
               value: "8125"
             - name: AIRFLOW__METRICS__STATSD_HOST
               valueFrom:
                 fieldRef:
                   fieldPath: status.hostIP
+            {{- include "standard_airflow_environment" . | indent 10 }}
           livenessProbe:
             initialDelaySeconds: 10
             timeoutSeconds: 20
@@ -125,7 +121,8 @@ spec:
               subPath: airflow_local_settings.py
               readOnly: true
             - name: dag-data
-              mountPath: /opt/airflow/data-pipeline
+              mountPath: /opt/airflow/dags
+              readOnly: true
         - name: scheduler-log-groomer
           resources:
             requests:
@@ -135,7 +132,6 @@ spec:
           args:
             - bash
             - /clean-logs
-
           env:
             - name: AIRFLOW__LOG_RETENTION_DAYS
               value: "15"
@@ -143,11 +139,12 @@ spec:
             - name: logs
               mountPath: "/opt/airflow/logs"
       volumes:
-        - name: dag-data
-          persistentVolumeClaim:
-            claimName: "dag-data-{{ .Values.env }}-pvc"
         - name: logs
           emptyDir: {}
         - name: config
           configMap:
-            name: {{ .Chart.Name }}-airflow-config-{{ .Values.env }}
+            name: airflow-config-{{ .Values.env }}
+            defaultMode: 0755
+        - name: dag-data
+          persistentVolumeClaim:
+            claimName: "dag-syncer-pvc-{{ .Values.env }}"

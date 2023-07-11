@@ -3,9 +3,12 @@ from airflow.decorators.task_group import task_group
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.python_operator import PythonOperator
 from datetime import datetime, timedelta
-import tweepy
 
-from modules.utils import safe_add
+import math
+
+def safe_add(a,b):
+    return a+b
+
 
 # Twitter API credentials
 # consumer_key = 'your_consumer_key'

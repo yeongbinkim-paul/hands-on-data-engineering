@@ -1,11 +1,10 @@
 ################################
-## Airflow Scheduler Service
+## Airflow Redis Service
 #################################
-kind: Service
 apiVersion: v1
+kind: Service
 metadata:
-  name: {{ .Chart.Name }}-scheduler-{{ .Values.env }}
-  namespace: "{{ .Release.Namespace }}"
+  name: "redis-{{ .Release.Namespace }}"
   labels:
 {{- with .Values.labels }}
 {{ toYaml . | indent 4 }}
@@ -14,10 +13,10 @@ spec:
   type: ClusterIP
   selector:
     tier: airflow
-    component: scheduler
+    component: redis
     release: {{ .Chart.Name }}
   ports:
-    - name: task-logs
+    - name: redis-db
       protocol: TCP
-      port: 8793
-      targetPort: 8793
+      port: 6379
+      targetPort: 6379
