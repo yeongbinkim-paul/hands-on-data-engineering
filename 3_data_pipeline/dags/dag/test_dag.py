@@ -9,6 +9,8 @@ import math
 def safe_add(a,b):
     return a+b
 
+def safe_sub(a,b):
+    return a-b
 
 # Twitter API credentials
 # consumer_key = 'your_consumer_key'
@@ -53,7 +55,25 @@ def crawl_twitter_dag():
         )
         start_task_op >> add_op >> end_task_op
 
+    @task_group(
+        group_id="test_task_group_2", tooltip="Task group for test"
+    )
+    def sub_task_group():
+        start_task_op = DummyOperator(task_id="tg_start")
+        end_task_op = DummyOperator(task_id="tg_end")
+
+        sub_op = PythonOperator(
+            task_id="sub_task",
+            python_callable=safe_sub,
+            op_kwargs={
+                "a": 1,
+                "b": 2
+            }
+        )
+        start_task_op >> sub_op >> end_task_op
+
     add_tg = add_task_group()
-    start_task >> add_tg >> end_task
+    sub_tg = sub_task_group()
+    start_task >> add_tg >> sub_tg >> end_task
 # Set the task dependencies
 crawl_twitter = crawl_twitter_dag()

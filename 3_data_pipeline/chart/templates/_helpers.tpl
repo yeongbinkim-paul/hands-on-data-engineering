@@ -2,10 +2,6 @@
 {{ printf "postgresql://postgres:%s@postgresql-%s:5432/postgres?sslmode=disable" .Values.postgres.postgresPassword .Release.Namespace }}
 {{- end -}}
 
-{{- define "git_sync_image" -}}
-{{ printf "%s:%s" .Values.images.gitSync.repository .Values.images.gitSync.tag }}
-{{- end -}}
-
 {{- define "airflow_image" -}}
 {{ printf "%s:%s" .Values.images.airflow.repository .Values.images.airflow.tag }}
 {{- end -}}

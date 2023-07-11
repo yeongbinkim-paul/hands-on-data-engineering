@@ -44,7 +44,6 @@ gitSync:
   enabled: true
   repo: https://github.com/yeongbinkim-paul/hands-on-data-engineering
   branch: dev
-  subPath: 3_data_pipeline/dags
   resources:
     requests:
       cpu: 100m
@@ -80,7 +79,7 @@ airflowCfg: |-
   max_num_rendered_ti_fields_per_task = 30
 
   colored_console_log = False
-  dags_folder = /opt/airflow/dags
+  dags_folder = /opt/airflow/dags/data-pipeline/3_data_pipeline
   executor = CeleryKubernetesExecutor
   load_examples = False
   parallelism = 10000

@@ -63,9 +63,10 @@ spec:
                 if [ ! -d "data-pipeline" ]; then
                   mkdir data-pipeline
                   cd data-pipeline
-                  git clone -b {{ .Values.gitSync.branch }} {{ .Values.gitSync.repo }}
+                  git clone -b {{ .Values.gitSync.branch }} {{ .Values.gitSync.repo }} .
                 else
                   cd data-pipeline
+                  git checkout {{ .Values.gitSync.branch }}
                   git pull
                 fi
                 sleep 60
