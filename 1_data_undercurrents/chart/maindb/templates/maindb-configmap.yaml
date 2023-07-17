@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: maindb-config
+  labels:
+    app: maindb
+data:
+  POSTGRES_DB: maindb
+  POSTGRES_USER: admin
+  POSTGRES_PASSWORD: admin

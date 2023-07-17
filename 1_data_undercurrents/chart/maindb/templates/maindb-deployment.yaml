@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: maindb
+spec:
+  selector:
+    matchLabels:
+      app: maindb
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: maindb
+    spec:
+      containers:
+        - name: maindb
+          image: postgres:10.4
+          imagePullPolicy: "IfNotPresent"
+          ports:
+            - name: maindb
+              containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: maindb-config
+          volumeMounts:
+            - name: maindb
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: maindb
+          persistentVolumeClaim:
+            claimName: maindb-pv-claim
