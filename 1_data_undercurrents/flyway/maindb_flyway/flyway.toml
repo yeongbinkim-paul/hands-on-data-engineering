@@ -1,0 +1,24 @@
+databaseType = "PostgreSql"
+name = "maindb_flyway"
+id = "8a2038e1-4473-4a25-9ab1-148b557c8e5d"
+
+[flywayDesktop]
+developmentEnvironment = "development"
+shadowEnvironment = "shadow"
+schemaModel = "./schema-model"
+
+[redgateCompare]
+filterFile = "filter.rgf"
+
+[flyway]
+mixed = true
+outOfOrder = true
+locations = [ "filesystem:migrations" ]
+validateMigrationNaming = true
+
+[environments.maindb]
+url = "jdbc:postgresql://localhost:4321/maindb"
+user = "admin"
+password = "admin"
+schemas = [ "maindb" ]
+displayName = "maindb"
